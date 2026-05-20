@@ -1,0 +1,9 @@
+
+DOMAIN INSIGHTS FROM EDA
+=========================
+1. Image sizes vary widely (from ~180px to ~500px) -> center-crop + resize to 224x224 is mandatory.
+2. Mean pixel intensity varies between classes -> ColorJitter augmentation is justified.
+3. Some glioma images are much darker than meningioma images -> brightness normalization matters.
+4. The binary class split is approximately 75% tumor / 25% no_tumor -> slight imbalance, handled by class weights.
+5. MRI scans use predominantly dark backgrounds -> this is the key OOD signal (heuristic gate).
+Add your own observations here after viewing the grid above.

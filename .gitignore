@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Dataset (too large for git — download via Kaggle API)
+data/
+!data/.gitkeep
+
+# Model weights (large binary files — store on HuggingFace Hub)
+models/*.pt
+models/*.pth
+checkpoints/
+!models/.gitkeep
+!checkpoints/.gitkeep
+
+# Logs
+logs/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / API keys
+.env
+kaggle.json
+*.key
+
+# IDE
+.vscode/
+.idea/
+*.swp

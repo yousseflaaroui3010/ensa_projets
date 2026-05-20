@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classificateur IRM Cérébrale — Prototype</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="components/UploadPanel.jsx"></script>
+  <script type="text/babel" src="components/ResultPanel.jsx"></script>
+  <script type="text/babel" src="components/MetricsDashboard.jsx"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue: #2563EB;
+      --blue-dark: #1D4ED8;
+      --blue-light: #EFF6FF;
+      --slate: #0F172A;
+      --muted: #64748B;
+      --border: #E2EAF4;
+      --surface: #F8FAFC;
+      --white: #FFFFFF;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: #F0F4FA;
+      color: var(--slate);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #root { height: 100%; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.5; }
+    }
+
+    .analyzing-pulse { animation: pulse 1.4s ease-in-out infinite; }
+    .fade-in { animation: fadeIn 0.35s ease forwards; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── Simulated MRI placeholder images (SVG data URLs) ─────────────────────────
+const makeMRISvg = (hasAnomaly, color) => {
+  const base64 = btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224">
+    <rect width="224" height="224" fill="#0a0a0a"/>
+    <ellipse cx="112" cy="112" rx="88" ry="100" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+    <ellipse cx="112" cy="112" rx="78" ry="90" fill="#181818"/>
+    <ellipse cx="112" cy="100" rx="60" ry="70" fill="#222"/>
+    <ellipse cx="112" cy="112" rx="40" ry="48" fill="#2a2a2a"/>
+    <path d="M112 40 Q130 70 112 100 Q94 70 112 40" fill="#1e1e1e"/>
+    <path d="M112 120 Q130 150 112 180 Q94 150 112 120" fill="#1e1e1e"/>
+    <ellipse cx="80" cy="105" rx="18" ry="22" fill="#242424"/>
+    <ellipse cx="144" cy="105" rx="18" ry="22" fill="#242424"/>
+    ${hasAnomaly ? `<ellipse cx="138" cy="88" rx="14" ry="12" fill="${color}" opacity="0.85"/>
+    <ellipse cx="138" cy="88" rx="10" ry="8" fill="${color}" opacity="0.6"/>
+    <circle cx="138" cy="88" r="5" fill="white" opacity="0.3"/>` : ''}
+    <ellipse cx="112" cy="112" rx="88" ry="100" fill="none" stroke="#333" stroke-width="2"/>
+    <line x1="40" y1="112" x2="184" y2="112" stroke="#1a1a1a" stroke-width="0.5"/>
+    <line x1="112" y1="12" x2="112" y2="212" stroke="#1a1a1a" stroke-width="0.5"/>
+  </svg>`);
+  return `data:image/svg+xml;base64,${base64}`;
+};
+
+const makeGradcamSvg = (hasAnomaly) => {
+  const base64 = btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224">
+    <rect width="224" height="224" fill="#0a0a0a"/>
+    <ellipse cx="112" cy="112" rx="88" ry="100" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+    <ellipse cx="112" cy="112" rx="78" ry="90" fill="#181818"/>
+    ${hasAnomaly ? `
+    <radialGradient id="heat" cx="61.6%" cy="39.3%" r="50%">
+      <stop offset="0%" stop-color="#ff0000" stop-opacity="0.9"/>
+      <stop offset="30%" stop-color="#ff6600" stop-opacity="0.7"/>
+      <stop offset="60%" stop-color="#ffaa00" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#0044ff" stop-opacity="0.1"/>
+    </radialGradient>
+    <ellipse cx="138" cy="88" rx="40" ry="36" fill="url(#heat)"/>
+    <ellipse cx="138" cy="88" rx="14" ry="12" fill="#ff2200" opacity="0.8"/>
+    ` : `
+    <radialGradient id="heat2" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0044ff" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0044ff" stop-opacity="0.05"/>
+    </radialGradient>
+    <ellipse cx="112" cy="112" rx="60" ry="70" fill="url(#heat2)"/>
+    `}
+    <ellipse cx="112" cy="112" rx="88" ry="100" fill="none" stroke="#333" stroke-width="2"/>
+  </svg>`);
+  return `data:image/svg+xml;base64,${base64}`;
+};
+
+const SAMPLE_IMAGES = [
+  { name: 'tumor_sample.png', label: 'Cas Tumeur', icon: '🔴', color: '#FEE2E2', state: 'TUMOR', confidence: 0.963, tumorProb: 0.963, noTumorProb: 0.037 },
+  { name: 'clear_sample.png', label: 'Cas Sain', icon: '🟢', color: '#DCFCE7', state: 'CLEAR', confidence: 0.941, tumorProb: 0.059, noTumorProb: 0.941 },
+  { name: 'uncertain_sample.png', label: 'Cas Incertain', icon: '🟡', color: '#FEF9C3', state: 'UNCERTAIN', confidence: 0.74, tumorProb: 0.74, noTumorProb: 0.26 },
+];
+SAMPLE_IMAGES[0].src = makeMRISvg(true, '#ff3300');
+SAMPLE_IMAGES[1].src = makeMRISvg(false, '');
+SAMPLE_IMAGES[2].src = makeMRISvg(true, '#886600');
+
+// ── Simulated inference engine ────────────────────────────────────────────────
+const simulateInference = (imageSrc, imageName, threshold) => {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const known = SAMPLE_IMAGES.find(s => s.src === imageSrc);
+    setTimeout(() => {
+      const latencyMs = Math.round(performance.now() - start);
+      if (known) {
+        resolve({
+          state: known.state,
+          confidence: known.confidence,
+          tumorProb: known.tumorProb,
+          noTumorProb: known.noTumorProb,
+          gradcamSrc: (known.state === 'TUMOR' || known.state === 'CLEAR') ? makeGradcamSvg(known.state === 'TUMOR') : null,
+          latencyMs,
+        });
+      } else {
+        // For user-uploaded real images, simulate a random result
+        const r = Math.random();
+        if (r < 0.12) {
+          resolve({ state: 'OOD', confidence: 0, tumorProb: null, noTumorProb: null, gradcamSrc: null, latencyMs, errorMsg: 'L\'image ne correspond pas aux caractéristiques d\'une IRM cérébrale.' });
+        } else {
+          const conf = 0.72 + Math.random() * 0.27;
+          const isTumor = Math.random() > 0.5;
+          const finalConf = Math.max(conf, threshold - 0.01);
+          resolve({
+            state: finalConf >= threshold ? (isTumor ? 'TUMOR' : 'CLEAR') : 'UNCERTAIN',
+            confidence: finalConf,
+            tumorProb: isTumor ? finalConf : 1 - finalConf,
+            noTumorProb: isTumor ? 1 - finalConf : finalConf,
+            gradcamSrc: finalConf >= threshold ? makeGradcamSvg(isTumor) : null,
+            latencyMs,
+          });
+        }
+      }
+    }, 1200 + Math.random() * 600);
+  });
+};
+
+// ── Medical Disclaimer Banner ─────────────────────────────────────────────────
+const DisclaimerBanner = ({ onDismiss }) => (
+  <div style={appStyles.disclaimerBanner}>
+    <div style={appStyles.disclaimerContent}>
+      <span style={appStyles.disclaimerIcon}>⚕️</span>
+      <p style={appStyles.disclaimerText}>
+        <strong>Avertissement médical :</strong> Cet outil est un prototype de recherche à des fins académiques uniquement.
+        Il n'a <strong>pas</strong> été validé cliniquement et <strong>ne doit pas</strong> être utilisé pour le diagnostic de patients réels.
+        Consultez toujours un radiologue qualifié.
+      </p>
+    </div>
+    <button style={appStyles.disclaimerClose} onClick={onDismiss}>✕</button>
+  </div>
+);
+
+// ── Top Navigation ─────────────────────────────────────────────────────────────
+const TopNav = ({ showMetrics, setShowMetrics }) => (
+  <nav style={appStyles.nav}>
+    <div style={appStyles.navBrand}>
+      <div style={appStyles.navLogo}>
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="11" r="10" stroke="#2563EB" strokeWidth="1.5"/>
+          <ellipse cx="11" cy="11" rx="7" ry="8" fill="none" stroke="#2563EB" strokeWidth="1"/>
+          <circle cx="14" cy="8" r="2.5" fill="#2563EB" opacity="0.7"/>
+          <circle cx="14" cy="8" r="1.2" fill="#EFF6FF"/>
+        </svg>
+      </div>
+      <div>
+        <span style={appStyles.navTitle}>NeuraScan</span>
+        <span style={appStyles.navSub}>Classificateur IRM Cérébrale</span>
+      </div>
+    </div>
+
+    <div style={appStyles.navRight}>
+      <div style={appStyles.navBadge}>v1.0 · Binaire</div>
+      <button
+        style={{ ...appStyles.navBtn, ...(showMetrics ? appStyles.navBtnActive : {}) }}
+        onClick={() => setShowMetrics(v => !v)}
+      >
+        📊 Performances
+      </button>
+      <div style={appStyles.navStatus}>
+        <span style={appStyles.statusDot}></span>
+        <span style={appStyles.statusText}>Modèle actif</span>
+      </div>
+    </div>
+  </nav>
+);
+
+// ── Main App ───────────────────────────────────────────────────────────────────
+const App = () => {
+  const { useTweaks, TweaksPanel, TweakSection, TweakSlider, TweakToggle, TweakRadio, TweakColor } = window;
+
+  const [tweaks, setTweak] = useTweaks(/*EDITMODE-BEGIN*/{
+    "threshold": 90,
+    "showMetrics": true,
+    "accentColor": "#2563EB",
+    "showGradcam": true,
+    "darkMode": false
+  }/*EDITMODE-END*/);
+
+  const threshold = tweaks.threshold / 100;
+
+  const [imageSrc, setImageSrc] = useState(null);
+  const [imageName, setImageName] = useState(null);
+  const [result, setResult] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [showMetricsLocal, setShowMetricsLocal] = useState(tweaks.showMetrics);
+
+  const handleImageLoaded = (src, name) => {
+    setImageSrc(src);
+    setImageName(name);
+    setResult(null);
+  };
+
+  const handleAnalyze = async () => {
+    if (!imageSrc) return;
+    setAnalyzing(true);
+    setResult(null);
+    try {
+      const res = await simulateInference(imageSrc, imageName, threshold);
+      setResult(res);
+    } catch (e) {
+      setResult({ state: 'ERROR', confidence: 0, errorMsg: 'Erreur inattendue lors de l\'analyse.', latencyMs: 0 });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const dm = tweaks.darkMode;
+  const ac = tweaks.accentColor;
+
+  // Dynamic CSS variables
+  useEffect(() => {
+    document.documentElement.style.setProperty('--blue', ac);
+    document.documentElement.style.setProperty('--blue-dark', ac);
+    document.body.style.background = dm ? '#0B1120' : '#F0F4FA';
+    document.body.style.color = dm ? '#E2EAF4' : '#0F172A';
+  }, [dm, ac]);
+
+  return (
+    <div style={{ ...appStyles.root, background: dm ? '#0B1120' : '#F0F4FA' }}>
+      {showDisclaimer && <DisclaimerBanner onDismiss={() => setShowDisclaimer(false)} />}
+
+      <TopNav showMetrics={showMetricsLocal} setShowMetrics={(v) => {
+        setShowMetricsLocal(v);
+        setTweak('showMetrics', v);
+      }} />
+
+      <main style={appStyles.main}>
+        {/* Side-by-side workspace */}
+        <div style={appStyles.workspace}>
+          {/* Left — upload */}
+          <div style={appStyles.leftCol}>
+            <UploadPanel
+              onImageLoaded={handleImageLoaded}
+              onAnalyze={handleAnalyze}
+              imageLoaded={!!imageSrc}
+              analyzing={analyzing}
+              sampleImages={SAMPLE_IMAGES}
+            />
+          </div>
+
+          {/* Right — results */}
+          <div style={{ ...appStyles.rightCol, ...(analyzing ? { opacity: 0.7 } : {}) }}>
+            {analyzing ? (
+              <div style={appStyles.analyzingOverlay} className="analyzing-pulse">
+                <div style={appStyles.analyzingSpinner}></div>
+                <p style={appStyles.analyzingText}>Analyse de l'image IRM en cours…</p>
+                <p style={appStyles.analyzingHint}>EfficientNetB0 · Grad-CAM · Seuil {tweaks.threshold}%</p>
+              </div>
+            ) : (
+              <div className={result ? 'fade-in' : ''} style={{ height: '100%' }}>
+                <ResultPanel result={result} imageSrc={imageSrc} threshold={threshold} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Performance metrics — collapsible */}
+        {showMetricsLocal && <MetricsDashboard visible={true} />}
+
+        {/* How it works */}
+        <div style={appStyles.howSection}>
+          <h3 style={appStyles.howTitle}>Comment ça fonctionne</h3>
+          <div style={appStyles.howGrid}>
+            {[
+              { step: '01', icon: '📤', title: 'Upload', desc: 'Déposez une coupe IRM 2D (axiale, coronale ou sagittale) en JPG ou PNG.' },
+              { step: '02', icon: '⚙️', title: 'Prétraitement', desc: 'L\'image est redimensionnée à 224×224 px et normalisée avec les statistiques ImageNet.' },
+              { step: '03', icon: '🧠', title: 'Classification', desc: 'EfficientNetB0 pré-entraîné analyse l\'image et produit une probabilité de tumeur.' },
+              { step: '04', icon: '🎯', title: 'Décision', desc: `Si la confiance ≥ ${tweaks.threshold}%, le résultat est affiché. Sinon, une revue manuelle est requise.` },
+            ].map(s => (
+              <div key={s.step} style={appStyles.howCard}>
+                <div style={appStyles.howStep}>{s.step}</div>
+                <div style={appStyles.howIcon}>{s.icon}</div>
+                <h4 style={appStyles.howCardTitle}>{s.title}</h4>
+                <p style={appStyles.howCardDesc}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={appStyles.footer}>
+        <span>NeuraScan — Prototype Académique v1.0</span>
+        <span style={appStyles.footerDot}></span>
+        <span>EfficientNetB0 · Transfer Learning · PyTorch</span>
+        <span style={appStyles.footerDot}></span>
+        <span>Dataset : masoudnickparvar/brain-tumor-mri-dataset (CC BY 4.0)</span>
+      </footer>
+
+      {/* Tweaks Panel */}
+      <TweaksPanel tweaks={tweaks} setTweak={setTweak}>
+        <TweakSection title="Seuil de confiance">
+          <TweakSlider id="threshold" label="Seuil clinique (%)" min={70} max={99} step={1} />
+        </TweakSection>
+        <TweakSection title="Affichage">
+          <TweakToggle id="showMetrics" label="Tableau de bord performances" />
+          <TweakToggle id="showGradcam" label="Overlay Grad-CAM" />
+          <TweakToggle id="darkMode" label="Mode sombre" />
+        </TweakSection>
+        <TweakSection title="Couleur d'accent">
+          <TweakColor id="accentColor" label="Couleur principale" options={['#2563EB', '#0891B2', '#059669', '#7C3AED', '#DC2626']} />
+        </TweakSection>
+      </TweaksPanel>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.55; }
+        }
+        .fade-in { animation: fadeIn 0.35s ease forwards; }
+        .analyzing-pulse { animation: pulse 1.4s ease-in-out infinite; }
+      `}</style>
+    </div>
+  );
+};
+
+// ── App Styles ────────────────────────────────────────────────────────────────
+const appStyles = {
+  root: {
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: "'DM Sans', system-ui, sans-serif",
+  },
+  disclaimerBanner: {
+    background: '#1E3A5F',
+    color: '#BFDBFE',
+    padding: '10px 24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '16px',
+    fontSize: '13px',
+    lineHeight: 1.5,
+  },
+  disclaimerContent: { display: 'flex', alignItems: 'flex-start', gap: '10px', flex: 1 },
+  disclaimerIcon: { fontSize: '16px', flexShrink: 0, marginTop: '1px' },
+  disclaimerText: { margin: 0, color: '#BFDBFE' },
+  disclaimerClose: {
+    background: 'none', border: 'none', color: '#64748B',
+    cursor: 'pointer', fontSize: '16px', flexShrink: 0, padding: '4px',
+  },
+  nav: {
+    background: '#FFFFFF',
+    borderBottom: '1px solid #E2EAF4',
+    padding: '0 28px',
+    height: '60px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'sticky',
+    top: 0,
+    zIndex: 100,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  },
+  navBrand: { display: 'flex', alignItems: 'center', gap: '12px' },
+  navLogo: {
+    width: '36px', height: '36px',
+    background: '#EFF6FF', borderRadius: '10px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '1px solid #BFDBFE',
+  },
+  navTitle: { display: 'block', fontSize: '16px', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.4px' },
+  navSub: { display: 'block', fontSize: '11px', color: '#64748B', letterSpacing: '0.01em' },
+  navRight: { display: 'flex', alignItems: 'center', gap: '12px' },
+  navBadge: {
+    background: '#F1F5F9', color: '#64748B',
+    fontSize: '11px', fontWeight: '600', padding: '3px 8px',
+    borderRadius: '20px', border: '1px solid #E2E8F0',
+  },
+  navBtn: {
+    background: 'none', border: '1px solid #E2EAF4',
+    borderRadius: '8px', padding: '6px 12px',
+    fontSize: '13px', color: '#475569', cursor: 'pointer',
+    transition: 'all 0.15s',
+    fontFamily: 'inherit',
+  },
+  navBtnActive: {
+    background: '#EFF6FF', borderColor: '#BFDBFE', color: '#1D4ED8',
+  },
+  navStatus: { display: 'flex', alignItems: 'center', gap: '6px' },
+  statusDot: {
+    width: '8px', height: '8px', borderRadius: '50%',
+    background: '#16A34A',
+    boxShadow: '0 0 0 2px rgba(22,163,74,0.2)',
+  },
+  statusText: { fontSize: '12px', color: '#64748B' },
+  main: {
+    flex: 1,
+    maxWidth: '1300px',
+    margin: '0 auto',
+    width: '100%',
+    padding: '28px 24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px',
+  },
+  workspace: {
+    display: 'grid',
+    gridTemplateColumns: '420px 1fr',
+    gap: '20px',
+    alignItems: 'stretch',
+  },
+  leftCol: { display: 'flex', flexDirection: 'column' },
+  rightCol: { display: 'flex', flexDirection: 'column', transition: 'opacity 0.3s' },
+  analyzingOverlay: {
+    height: '100%',
+    background: '#FFFFFF',
+    borderRadius: '16px',
+    border: '1px solid #E2EAF4',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '40px',
+  },
+  analyzingSpinner: {
+    width: '48px', height: '48px',
+    border: '4px solid #DBEAFE',
+    borderTopColor: '#2563EB',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+  },
+  analyzingText: { margin: 0, fontSize: '16px', fontWeight: '600', color: '#1E40AF' },
+  analyzingHint: { margin: 0, fontSize: '13px', color: '#94A3B8' },
+  howSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  howTitle: { fontSize: '16px', fontWeight: '700', color: '#0F172A', margin: 0 },
+  howGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '14px',
+  },
+  howCard: {
+    background: '#FFFFFF',
+    borderRadius: '12px',
+    border: '1px solid #E2EAF4',
+    padding: '20px 18px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  howStep: { fontSize: '11px', fontWeight: '700', color: '#94A3B8', letterSpacing: '0.08em' },
+  howIcon: { fontSize: '24px' },
+  howCardTitle: { fontSize: '15px', fontWeight: '700', color: '#0F172A', margin: 0 },
+  howCardDesc: { fontSize: '13px', color: '#64748B', lineHeight: 1.5, margin: 0 },
+  footer: {
+    background: '#FFFFFF',
+    borderTop: '1px solid #E2EAF4',
+    padding: '14px 28px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    fontSize: '12px',
+    color: '#94A3B8',
+    flexWrap: 'wrap',
+  },
+  footerDot: {
+    width: '3px', height: '3px', borderRadius: '50%',
+    background: '#CBD5E1', display: 'inline-block', flexShrink: 0,
+  },
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

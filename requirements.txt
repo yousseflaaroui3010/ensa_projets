@@ -1,0 +1,46 @@
+# Brain Tumor MRI Classifier — Python dependencies
+# Pin exact versions for reproducibility across machines and Colab.
+# Install with: pip install -r requirements.txt
+
+# Core ML framework — versions compatible with Python 3.13
+torch==2.6.0
+torchvision==0.21.0
+
+# Grad-CAM: generates heatmaps showing which image regions the model focused on
+grad-cam==1.5.2
+
+# Web prototype UI (v1) — 1.37+ supports numpy 2.x
+streamlit==1.40.0
+
+# Image handling
+opencv-python-headless>=4.10.0      # 4.10+ required for NumPy 2.x compatibility
+Pillow==10.4.0
+
+# Numerical computing — 2.x has pre-built wheels for Python 3.13
+numpy==2.2.0
+
+# Data manipulation & analysis — 2.3+ has Python 3.13 wheels
+pandas==2.3.0
+
+# Plots: EDA, confusion matrix, loss curves — 3.10+ has Python 3.13 wheels
+matplotlib==3.10.0
+seaborn==0.13.2
+
+# ML utilities: metrics, train/test split, confusion matrix — 1.6+ has Python 3.13 wheels
+scikit-learn==1.6.0
+
+# Config file loading
+PyYAML==6.0.1
+
+# Progress bars in training loops
+tqdm==4.66.4
+
+# Kaggle API: download dataset inside Colab
+kaggle==1.6.14
+
+# HuggingFace Hub: store/load model weights (files >100MB can't go in git)
+huggingface-hub==0.23.2
+
+# Jupyter support for notebooks
+ipykernel==6.29.4
+ipywidgets==8.1.3

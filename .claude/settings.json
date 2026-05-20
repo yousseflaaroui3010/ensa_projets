@@ -1,0 +1,22 @@
+{
+  "model": "sonnet",
+  "effortLevel": "default",
+  "permissions": {
+    "additionalDirectories": [
+      "c:\\Users\\lenovo\\OneDrive\\Documents\\Projects\\courses\\course-generator\\client\\src",
+      "c:\\Users\\lenovo\\OneDrive\\Documents\\Projects\\courses\\course-generator\\server\\src",
+      "C:\\Users\\lenovo\\.claude\\plans"
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "nx-claude-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "nrwl/nx-ai-agents-config"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "nx@nx-claude-plugins": true
+  }
+}

@@ -1,0 +1,93 @@
+# ============================================================
+# Brain Tumor MRI Classifier — Central Configuration
+# All thresholds, paths, and hyperparameters live here.
+# Never hardcode these values inside Python files.
+# ============================================================
+
+# ----- Paths ------------------------------------------------
+paths:
+  data_root: "data/"                        # raw Kaggle dataset goes here
+  train_dir: "data/Training"
+  test_dir: "data/Testing"
+  models_dir: "models/"
+  logs_dir: "logs/"
+  checkpoints_dir: "checkpoints/"
+
+# ----- Dataset ----------------------------------------------
+dataset:
+  random_seed: 42
+  val_split: 0.15                           # fraction of training data used for validation
+  image_size: 224                           # pixels — EfficientNetB0 expects 224×224
+  # Binary label mapping: all tumor types collapse to class 1
+  binary_map:
+    glioma: 1
+    meningioma: 1
+    pituitary: 1
+    no_tumor: 0    # canonical name
+    notumor: 0     # actual folder name in masoudnickparvar dataset
+  class_names: ["no_tumor", "tumor"]        # index 0 = no tumor, index 1 = tumor
+
+# ----- Preprocessing ----------------------------------------
+preprocessing:
+  # ImageNet mean/std — used because EfficientNetB0 was pre-trained on ImageNet
+  normalize_mean: [0.485, 0.456, 0.406]
+  normalize_std: [0.229, 0.224, 0.225]
+
+# ----- Augmentation (training only) -------------------------
+augmentation:
+  horizontal_flip_prob: 0.5
+  rotation_degrees: 15
+  brightness_jitter: 0.2
+  contrast_jitter: 0.2
+  translate_range: [0.1, 0.1]
+
+# ----- Model ------------------------------------------------
+model:
+  backbone: "efficientnet_b0"               # torchvision model name
+  num_classes: 2
+  dropout_rate: 0.3                         # applied before final classification head
+  pretrained: true                          # use ImageNet weights for base layers
+
+# ----- Training ---------------------------------------------
+training:
+  # Phase 1: train classification head only (base layers frozen)
+  phase1_epochs: 10
+  phase1_lr: 0.001                          # learning rate for Adam optimizer
+  phase1_batch_size: 32
+  # Phase 2: fine-tune last 2 conv blocks + head (lower lr to avoid destroying pretrained weights)
+  phase2_epochs: 5
+  phase2_lr: 0.0001
+  phase2_batch_size: 32
+  # Class weights: penalize missed tumors (False Negatives) more than false alarms
+  # index 0 = no_tumor weight, index 1 = tumor weight
+  class_weights: [1.0, 2.5]
+
+# ----- OOD (Out-of-Distribution) Gate -----------------------
+# OOD gate checks "Is this a brain MRI?" before running the main classifier.
+ood:
+  model_path: "models/ood_gate.pt"
+  rejection_threshold: 0.70                 # if P(is_brain_mri) < this → reject upload
+  image_size: 224
+
+# ----- Inference / Confidence Thresholds --------------------
+inference:
+  # Dual-confidence threshold engine:
+  # - P(tumor) >= high_confidence_threshold   → "Tumor Detected"     (red card)
+  # - P(no_tumor) >= high_confidence_threshold → "No Tumor Detected" (green card)
+  # - Neither class reaches threshold          → "Manual Review"      (amber card)
+  high_confidence_threshold: 0.90
+  classification_threshold: 0.50            # raw sigmoid cutoff used during training evaluation
+
+# ----- Grad-CAM (Explainability) ----------------------------
+# Grad-CAM highlights which brain regions influenced the prediction.
+gradcam:
+  target_layer: "features"                  # last convolutional block of EfficientNetB0
+  heatmap_alpha: 0.4                        # transparency of heatmap overlay (0=invisible, 1=opaque)
+  colormap: "jet"                           # color scale: blue=low attention, red=high attention
+
+# ----- Logging ----------------------------------------------
+logging:
+  log_file: "logs/inference.log"
+  rotation: "1 day"
+  retention: "7 days"
+  level: "INFO"
