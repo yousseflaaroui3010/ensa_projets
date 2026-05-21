@@ -1,0 +1,16 @@
+
+╔══════════════════════════════════════════╗
+║  FINAL EVALUATION RESULTS — TEST SET    ║
+╠══════════════════════════════════════════╣
+║  Accuracy   : 97.12%  (target ≥ 92%)  ║
+║  Precision  : 99.83%  (target ≥ 85%)  ║
+║  Recall     : 96.33%  (target ≥ 95%)  ║
+║  Specificity: 99.50%                   ║
+║  F1-Score   : 0.9805  (target ≥ 0.90) ║
+║  AUC-ROC    : 0.9973  (target ≥ 0.97) ║
+╠══════════════════════════════════════════╣
+║  True Positives  (TP): 1156              ║
+║  False Positives (FP):    2  (false alarm) ║
+║  True Negatives  (TN):  398              ║
+║  False Negatives (FN):   44  (missed tumor) ║
+╚══════════════════════════════════════════╝
