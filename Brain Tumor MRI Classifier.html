@@ -7,10 +7,395 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script type="text/babel" src="tweaks-panel.jsx"></script>
-  <script type="text/babel" src="components/UploadPanel.jsx"></script>
-  <script type="text/babel" src="components/ResultPanel.jsx"></script>
-  <script type="text/babel" src="components/MetricsDashboard.jsx"></script>
+  <script type="text/babel">
+    // ── TweaksPanel ───────────────────────────────────────────────────────────────
+    (function () {
+      const { useState, useCallback, useContext, createContext } = React;
+      const Ctx = createContext(null);
+
+      function useTweaks(defaults) {
+        const [tweaks, setTweaks] = useState(defaults);
+        const setTweak = useCallback((id, val) => setTweaks(p => ({ ...p, [id]: val })), []);
+        return [tweaks, setTweak];
+      }
+
+      function TweaksPanel({ tweaks, setTweak, children }) {
+        const [open, setOpen] = useState(false);
+        return (
+          <Ctx.Provider value={{ tweaks, setTweak }}>
+            <button onClick={() => setOpen(v => !v)} title="Paramètres" style={{
+              position:'fixed', bottom:'24px', right:'24px',
+              width:'44px', height:'44px', borderRadius:'50%',
+              background:'#2563EB', border:'none', color:'white',
+              fontSize:'20px', cursor:'pointer', zIndex:1000,
+              boxShadow:'0 4px 14px rgba(37,99,235,0.45)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+            }}>⚙</button>
+            {open && (
+              <div style={{
+                position:'fixed', bottom:'80px', right:'24px', width:'290px',
+                background:'white', borderRadius:'16px', border:'1px solid #E2EAF4',
+                boxShadow:'0 8px 32px rgba(0,0,0,0.13)', zIndex:999, overflow:'hidden',
+              }}>
+                <div style={{ padding:'14px 20px', borderBottom:'1px solid #E2EAF4',
+                  display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontSize:'14px', fontWeight:'700', color:'#0F172A' }}>Paramètres</span>
+                  <button onClick={() => setOpen(false)} style={{
+                    background:'none', border:'none', color:'#94A3B8',
+                    cursor:'pointer', fontSize:'16px', padding:'2px 6px',
+                  }}>✕</button>
+                </div>
+                <div style={{ padding:'12px 0', maxHeight:'60vh', overflowY:'auto' }}>{children}</div>
+              </div>
+            )}
+          </Ctx.Provider>
+        );
+      }
+
+      function TweakSection({ title, children }) {
+        return (
+          <div style={{ padding:'10px 20px' }}>
+            <div style={{ fontSize:'11px', fontWeight:'700', color:'#94A3B8',
+              letterSpacing:'0.08em', textTransform:'uppercase', marginBottom:'10px' }}>{title}</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>{children}</div>
+          </div>
+        );
+      }
+
+      function TweakSlider({ id, label, min, max, step }) {
+        const { tweaks, setTweak } = useContext(Ctx);
+        return (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'6px' }}>
+              <span style={{ fontSize:'13px', color:'#475569' }}>{label}</span>
+              <span style={{ fontSize:'13px', fontWeight:'700', color:'#2563EB' }}>{tweaks[id]}%</span>
+            </div>
+            <input type="range" min={min} max={max} step={step} value={tweaks[id]}
+              onChange={e => setTweak(id, Number(e.target.value))}
+              style={{ width:'100%', accentColor:'#2563EB' }} />
+          </div>
+        );
+      }
+
+      function TweakToggle({ id, label }) {
+        const { tweaks, setTweak } = useContext(Ctx);
+        const on = tweaks[id];
+        return (
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:'13px', color:'#475569' }}>{label}</span>
+            <button onClick={() => setTweak(id, !on)} style={{
+              width:'36px', height:'20px', borderRadius:'10px',
+              background: on ? '#2563EB' : '#CBD5E1',
+              border:'none', cursor:'pointer', position:'relative', transition:'background 0.2s',
+            }}>
+              <div style={{
+                position:'absolute', top:'2px', left: on ? '18px' : '2px',
+                width:'16px', height:'16px', borderRadius:'50%',
+                background:'white', transition:'left 0.2s',
+              }} />
+            </button>
+          </div>
+        );
+      }
+
+      function TweakRadio({ id, label, options }) {
+        const { tweaks, setTweak } = useContext(Ctx);
+        return (
+          <div>
+            <div style={{ fontSize:'13px', color:'#475569', marginBottom:'6px' }}>{label}</div>
+            <div style={{ display:'flex', gap:'6px', flexWrap:'wrap' }}>
+              {options.map(opt => (
+                <button key={opt} onClick={() => setTweak(id, opt)} style={{
+                  padding:'4px 10px', borderRadius:'20px', fontSize:'12px', border:'1px solid',
+                  cursor:'pointer', fontFamily:'inherit',
+                  background: tweaks[id] === opt ? '#EFF6FF' : 'white',
+                  borderColor: tweaks[id] === opt ? '#2563EB' : '#E2EAF4',
+                  color: tweaks[id] === opt ? '#2563EB' : '#64748B',
+                }}>{opt}</button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      function TweakColor({ id, label, options }) {
+        const { tweaks, setTweak } = useContext(Ctx);
+        return (
+          <div>
+            <div style={{ fontSize:'13px', color:'#475569', marginBottom:'8px' }}>{label}</div>
+            <div style={{ display:'flex', gap:'8px' }}>
+              {options.map(c => (
+                <button key={c} onClick={() => setTweak(id, c)} style={{
+                  width:'24px', height:'24px', borderRadius:'50%', background:c,
+                  border: tweaks[id] === c ? '3px solid white' : '2px solid transparent',
+                  cursor:'pointer',
+                  outline: tweaks[id] === c ? `2px solid ${c}` : 'none',
+                }} />
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      window.useTweaks    = useTweaks;
+      window.TweaksPanel  = TweaksPanel;
+      window.TweakSection = TweakSection;
+      window.TweakSlider  = TweakSlider;
+      window.TweakToggle  = TweakToggle;
+      window.TweakRadio   = TweakRadio;
+      window.TweakColor   = TweakColor;
+    })();
+  </script>
+
+  <script type="text/babel">
+    // ── UploadPanel ───────────────────────────────────────────────────────────────
+    function UploadPanel({ onImageLoaded, onAnalyze, imageLoaded, analyzing, sampleImages }) {
+      const { useState, useRef, useCallback } = React;
+      const [dragOver, setDragOver]     = useState(false);
+      const [selected, setSelected]     = useState(null);
+      const fileRef = useRef(null);
+
+      const loadFile = useCallback((file) => {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => { setSelected(null); onImageLoaded(e.target.result, file.name); };
+        reader.readAsDataURL(file);
+      }, [onImageLoaded]);
+
+      const handleDrop = useCallback(e => {
+        e.preventDefault(); setDragOver(false); loadFile(e.dataTransfer.files[0]);
+      }, [loadFile]);
+
+      return (
+        <div style={{ background:'#fff', borderRadius:'16px', border:'1px solid #E2EAF4',
+          padding:'24px', display:'flex', flexDirection:'column', gap:'20px', height:'100%' }}>
+
+          <div>
+            <h2 style={{ margin:0, fontSize:'16px', fontWeight:'700', color:'#0F172A' }}>Sélection d'image</h2>
+            <p style={{ margin:'4px 0 0', fontSize:'13px', color:'#64748B' }}>Importez une coupe IRM ou choisissez un exemple.</p>
+          </div>
+
+          {/* Drop zone */}
+          <div onDrop={handleDrop}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => fileRef.current.click()}
+            style={{
+              border:`2px dashed ${dragOver ? '#2563EB' : '#BFDBFE'}`,
+              borderRadius:'12px', padding:'28px 20px', textAlign:'center',
+              cursor:'pointer', background: dragOver ? '#EFF6FF' : '#F8FAFC',
+              transition:'all 0.2s',
+            }}>
+            <div style={{ fontSize:'32px', marginBottom:'8px' }}>📤</div>
+            <p style={{ margin:0, fontSize:'14px', fontWeight:'600', color:'#1D4ED8' }}>Glissez une image ou cliquez</p>
+            <p style={{ margin:'4px 0 0', fontSize:'12px', color:'#94A3B8' }}>JPG, PNG — coupes axiales, coronales, sagittales</p>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }}
+              onChange={e => loadFile(e.target.files[0])} />
+          </div>
+
+          {/* Samples */}
+          <div>
+            <p style={{ margin:'0 0 10px', fontSize:'11px', fontWeight:'700', color:'#94A3B8',
+              textTransform:'uppercase', letterSpacing:'0.06em' }}>Exemples prédéfinis</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+              {sampleImages.map(s => (
+                <button key={s.name} onClick={() => { setSelected(s.name); onImageLoaded(s.src, s.name); }}
+                  style={{
+                    display:'flex', alignItems:'center', gap:'12px',
+                    padding:'10px 14px', borderRadius:'10px', fontFamily:'inherit',
+                    border:`1px solid ${selected === s.name ? '#2563EB' : '#E2EAF4'}`,
+                    background: selected === s.name ? '#EFF6FF' : 'white',
+                    cursor:'pointer', textAlign:'left', transition:'all 0.15s',
+                  }}>
+                  <img src={s.src} alt={s.label} style={{ width:'40px', height:'40px', borderRadius:'6px', objectFit:'cover' }} />
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:'13px', fontWeight:'600', color:'#0F172A' }}>{s.icon} {s.label}</div>
+                    <div style={{ fontSize:'12px', color:'#64748B' }}>Confiance : {(s.confidence * 100).toFixed(1)}%</div>
+                  </div>
+                  {selected === s.name && <span style={{ color:'#2563EB' }}>✓</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Analyze button */}
+          <button onClick={onAnalyze} disabled={!imageLoaded || analyzing} style={{
+            marginTop:'auto', padding:'14px', borderRadius:'12px', border:'none',
+            background: imageLoaded && !analyzing ? '#2563EB' : '#BFDBFE',
+            color:'white', fontSize:'15px', fontWeight:'700',
+            cursor: imageLoaded && !analyzing ? 'pointer' : 'not-allowed',
+            transition:'background 0.2s', fontFamily:'inherit',
+          }}>
+            {analyzing ? '⏳ Analyse en cours…' : "🔍 Analyser l'IRM"}
+          </button>
+        </div>
+      );
+    }
+  </script>
+
+  <script type="text/babel">
+    // ── ResultPanel ───────────────────────────────────────────────────────────────
+    function ResultPanel({ result, imageSrc, threshold }) {
+      const placeholder = (
+        <div style={{ height:'100%', background:'#fff', borderRadius:'16px', border:'1px solid #E2EAF4',
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+          gap:'12px', padding:'40px', color:'#94A3B8' }}>
+          <div style={{ fontSize:'52px' }}>🧠</div>
+          <p style={{ margin:0, fontSize:'15px', fontWeight:'600', color:'#64748B' }}>
+            {imageSrc ? 'Image prête' : 'Aucune image sélectionnée'}
+          </p>
+          <p style={{ margin:0, fontSize:'13px', textAlign:'center' }}>
+            {imageSrc
+              ? "Cliquez sur « Analyser l'IRM » pour lancer la classification."
+              : 'Importez une image IRM ou choisissez un exemple, puis lancez l\'analyse.'}
+          </p>
+          {imageSrc && <img src={imageSrc} alt="preview" style={{
+            width:'100px', height:'100px', borderRadius:'10px', objectFit:'cover',
+            border:'1px solid #E2EAF4', marginTop:'8px',
+          }} />}
+        </div>
+      );
+
+      if (!result) return placeholder;
+
+      const { state, confidence, tumorProb, noTumorProb, gradcamSrc, latencyMs, errorMsg } = result;
+      const cfgMap = {
+        TUMOR:     { color:'#DC2626', bg:'#FEF2F2', border:'#FECACA', icon:'⚠️', label:'Tumeur détectée',     sub:'Résultat positif — consultation spécialisée recommandée.' },
+        CLEAR:     { color:'#16A34A', bg:'#F0FDF4', border:'#BBF7D0', icon:'✅', label:'Aucune tumeur',        sub:'Résultat négatif — aucune anomalie significative détectée.' },
+        UNCERTAIN: { color:'#D97706', bg:'#FFFBEB', border:'#FDE68A', icon:'⚡', label:'Résultat incertain',   sub:`Confiance (${(confidence*100).toFixed(0)}%) sous le seuil de ${(threshold*100).toFixed(0)}% — revue manuelle requise.` },
+        OOD:       { color:'#7C3AED', bg:'#F5F3FF', border:'#DDD6FE', icon:'🚫', label:'Image non conforme',  sub: errorMsg || "L'image ne ressemble pas à une IRM cérébrale." },
+        ERROR:     { color:'#64748B', bg:'#F8FAFC', border:'#E2EAF4', icon:'⚠',  label:'Erreur',              sub: errorMsg || 'Une erreur inattendue s\'est produite.' },
+      };
+      const cfg = cfgMap[state] || cfgMap.ERROR;
+
+      return (
+        <div style={{ height:'100%', background:'#fff', borderRadius:'16px', border:'1px solid #E2EAF4',
+          padding:'24px', display:'flex', flexDirection:'column', gap:'20px' }}>
+
+          {/* Status banner */}
+          <div style={{ background:cfg.bg, border:`1px solid ${cfg.border}`, borderRadius:'12px',
+            padding:'16px 20px', display:'flex', alignItems:'center', gap:'14px' }}>
+            <span style={{ fontSize:'28px' }}>{cfg.icon}</span>
+            <div>
+              <div style={{ fontSize:'17px', fontWeight:'800', color:cfg.color }}>{cfg.label}</div>
+              <div style={{ fontSize:'13px', color:'#64748B', marginTop:'2px' }}>{cfg.sub}</div>
+            </div>
+          </div>
+
+          {/* Images */}
+          {imageSrc && (
+            <div style={{ display:'flex', gap:'14px' }}>
+              <div style={{ flex:1 }}>
+                <p style={{ margin:'0 0 8px', fontSize:'11px', fontWeight:'700', color:'#94A3B8',
+                  textTransform:'uppercase', letterSpacing:'0.06em' }}>Image originale</p>
+                <img src={imageSrc} alt="IRM" style={{ width:'100%', borderRadius:'10px',
+                  border:'1px solid #E2EAF4', objectFit:'cover', aspectRatio:'1/1' }} />
+              </div>
+              {gradcamSrc && (
+                <div style={{ flex:1 }}>
+                  <p style={{ margin:'0 0 8px', fontSize:'11px', fontWeight:'700', color:'#94A3B8',
+                    textTransform:'uppercase', letterSpacing:'0.06em' }}>Grad-CAM</p>
+                  <img src={gradcamSrc} alt="GradCAM" style={{ width:'100%', borderRadius:'10px',
+                    border:'1px solid #E2EAF4', objectFit:'cover', aspectRatio:'1/1' }} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Probability bars */}
+          {tumorProb !== null && noTumorProb !== null && (
+            <div>
+              <p style={{ margin:'0 0 10px', fontSize:'11px', fontWeight:'700', color:'#94A3B8',
+                textTransform:'uppercase', letterSpacing:'0.06em' }}>Probabilités</p>
+              {[
+                { label:'Tumeur', prob:tumorProb,   color:'#DC2626' },
+                { label:'Sain',   prob:noTumorProb, color:'#16A34A' },
+              ].map(({ label, prob, color }) => (
+                <div key={label} style={{ marginBottom:'10px' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
+                    <span style={{ fontSize:'13px', color:'#475569' }}>{label}</span>
+                    <span style={{ fontSize:'13px', fontWeight:'700', color }}>{(prob*100).toFixed(1)}%</span>
+                  </div>
+                  <div style={{ height:'8px', borderRadius:'4px', background:'#F1F5F9', overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${prob*100}%`, background:color,
+                      borderRadius:'4px', transition:'width 0.6s ease' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Meta footer */}
+          <div style={{ marginTop:'auto', display:'flex', gap:'16px', fontSize:'12px', color:'#94A3B8' }}>
+            <span>⏱ {latencyMs} ms</span>
+            <span>🎯 Seuil : {(threshold*100).toFixed(0)}%</span>
+            <span>🤖 EfficientNetB0</span>
+          </div>
+        </div>
+      );
+    }
+  </script>
+
+  <script type="text/babel">
+    // ── MetricsDashboard ──────────────────────────────────────────────────────────
+    function MetricsDashboard({ visible }) {
+      if (!visible) return null;
+
+      const metrics = [
+        { icon:'🎯', label:'Précision (Accuracy)', value:'97.12%', target:'≥ 92%',  ok:true },
+        { icon:'🔍', label:'Rappel (Recall)',       value:'96.33%', target:'≥ 95%',  ok:true },
+        { icon:'✅', label:'Précision (Precision)', value:'99.83%', target:'≥ 85%',  ok:true },
+        { icon:'🔒', label:'Spécificité',           value:'99.50%', target:'≥ 85%',  ok:true },
+        { icon:'⚖️', label:'F1-Score',              value:'0.9805', target:'≥ 0.90', ok:true },
+        { icon:'📈', label:'AUC-ROC',               value:'0.9973', target:'≥ 0.97', ok:true },
+      ];
+
+      const cm = [
+        { label:'Vrais positifs (TP)', value:1156, color:'#16A34A', bg:'#F0FDF4', desc:'Tumeurs correctement détectées' },
+        { label:'Faux positifs (FP)',  value:2,    color:'#D97706', bg:'#FFFBEB', desc:'Sains classés tumeur (fausse alarme)' },
+        { label:'Vrais négatifs (TN)', value:398,  color:'#2563EB', bg:'#EFF6FF', desc:'Sains correctement identifiés' },
+        { label:'Faux négatifs (FN)',  value:44,   color:'#DC2626', bg:'#FEF2F2', desc:'Tumeurs manquées' },
+      ];
+
+      return (
+        <div style={{ background:'#fff', borderRadius:'16px', border:'1px solid #E2EAF4', padding:'24px' }}>
+          <h3 style={{ margin:'0 0 20px', fontSize:'16px', fontWeight:'700', color:'#0F172A' }}>
+            📊 Performances du modèle — Ensemble de test
+          </h3>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', marginBottom:'20px' }}>
+            {metrics.map(m => (
+              <div key={m.label} style={{ background:'#F8FAFC', borderRadius:'10px',
+                padding:'14px 16px', border:'1px solid #E2EAF4' }}>
+                <div style={{ fontSize:'20px', marginBottom:'6px' }}>{m.icon}</div>
+                <div style={{ fontSize:'22px', fontWeight:'800', color:'#0F172A' }}>{m.value}</div>
+                <div style={{ fontSize:'12px', color:'#64748B', marginTop:'2px' }}>{m.label}</div>
+                <div style={{ fontSize:'11px', fontWeight:'600', marginTop:'4px',
+                  color: m.ok ? '#16A34A' : '#DC2626' }}>
+                  {m.ok ? '✓' : '✗'} Cible : {m.target}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'10px' }}>
+            {cm.map(c => (
+              <div key={c.label} style={{ background:c.bg, borderRadius:'10px', padding:'14px',
+                border:`1px solid ${c.color}33` }}>
+                <div style={{ fontSize:'26px', fontWeight:'800', color:c.color }}>{c.value}</div>
+                <div style={{ fontSize:'12px', fontWeight:'700', color:c.color, marginTop:'2px' }}>{c.label}</div>
+                <div style={{ fontSize:'11px', color:'#64748B', marginTop:'4px' }}>{c.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ margin:'14px 0 0', fontSize:'11px', color:'#94A3B8' }}>
+            Modèle : EfficientNetB0 · Transfer learning · Dataset : masoudnickparvar/brain-tumor-mri-dataset · 1 600 images de test
+          </p>
+        </div>
+      );
+    }
+  </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap');
 
@@ -116,42 +501,77 @@ SAMPLE_IMAGES[0].src = makeMRISvg(true, '#ff3300');
 SAMPLE_IMAGES[1].src = makeMRISvg(false, '');
 SAMPLE_IMAGES[2].src = makeMRISvg(true, '#886600');
 
-// ── Simulated inference engine ────────────────────────────────────────────────
+// ── Real inference engine — calls the FastAPI backend ────────────────────────
+const API_BASE = 'http://localhost:8000';
+
+// Maps backend state names → HTML state names
+const STATE_MAP = {
+  HIGH_CONFIDENCE_TUMOR: 'TUMOR',
+  HIGH_CONFIDENCE_CLEAR: 'CLEAR',
+  UNCERTAIN:             'UNCERTAIN',
+  OOD_REJECTED:          'OOD',
+  ERROR:                 'ERROR',
+};
+
 const simulateInference = (imageSrc, imageName, threshold) => {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const start = performance.now();
+
+    // Preset sample images: return fixed values instantly (no server round-trip needed)
     const known = SAMPLE_IMAGES.find(s => s.src === imageSrc);
-    setTimeout(() => {
-      const latencyMs = Math.round(performance.now() - start);
-      if (known) {
+    if (known) {
+      setTimeout(() => resolve({
+        state:      known.state,
+        confidence: known.confidence,
+        tumorProb:  known.tumorProb,
+        noTumorProb: known.noTumorProb,
+        gradcamSrc: (known.state === 'TUMOR' || known.state === 'CLEAR')
+          ? makeGradcamSvg(known.state === 'TUMOR') : null,
+        latencyMs: Math.round(performance.now() - start),
+      }), 300);
+      return;
+    }
+
+    // Real uploaded images: call the FastAPI backend
+    try {
+      // Convert data-URL → Blob so it can be sent as multipart/form-data
+      const fetchResp = await fetch(imageSrc);
+      const blob      = await fetchResp.blob();
+      const form      = new FormData();
+      form.append('file', blob, imageName || 'upload.jpg');
+
+      const resp = await fetch(`${API_BASE}/predict`, { method: 'POST', body: form });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: `HTTP ${resp.status}` }));
         resolve({
-          state: known.state,
-          confidence: known.confidence,
-          tumorProb: known.tumorProb,
-          noTumorProb: known.noTumorProb,
-          gradcamSrc: (known.state === 'TUMOR' || known.state === 'CLEAR') ? makeGradcamSvg(known.state === 'TUMOR') : null,
-          latencyMs,
+          state: 'ERROR', confidence: 0, tumorProb: null, noTumorProb: null,
+          gradcamSrc: null, latencyMs: Math.round(performance.now() - start),
+          errorMsg: err.detail || 'Erreur serveur inattendue.',
         });
-      } else {
-        // For user-uploaded real images, simulate a random result
-        const r = Math.random();
-        if (r < 0.12) {
-          resolve({ state: 'OOD', confidence: 0, tumorProb: null, noTumorProb: null, gradcamSrc: null, latencyMs, errorMsg: 'L\'image ne correspond pas aux caractéristiques d\'une IRM cérébrale.' });
-        } else {
-          const conf = 0.72 + Math.random() * 0.27;
-          const isTumor = Math.random() > 0.5;
-          const finalConf = Math.max(conf, threshold - 0.01);
-          resolve({
-            state: finalConf >= threshold ? (isTumor ? 'TUMOR' : 'CLEAR') : 'UNCERTAIN',
-            confidence: finalConf,
-            tumorProb: isTumor ? finalConf : 1 - finalConf,
-            noTumorProb: isTumor ? 1 - finalConf : finalConf,
-            gradcamSrc: finalConf >= threshold ? makeGradcamSvg(isTumor) : null,
-            latencyMs,
-          });
-        }
+        return;
       }
-    }, 1200 + Math.random() * 600);
+
+      const data = await resp.json();
+      resolve({
+        state:      STATE_MAP[data.state] || 'ERROR',
+        confidence: data.confidence ?? (data.tumor_probability !== null
+          ? Math.max(data.tumor_probability, data.no_tumor_probability) : 0),
+        tumorProb:  data.tumor_probability,
+        noTumorProb: data.no_tumor_probability,
+        gradcamSrc: data.gradcam_image  ? `data:image/png;base64,${data.gradcam_image}`  : null,
+        latencyMs:  Math.round(data.latency_ms),
+        errorMsg:   data.error_message,
+      });
+
+    } catch (_) {
+      // Server is not running — give an actionable error message
+      resolve({
+        state: 'ERROR', confidence: 0, tumorProb: null, noTumorProb: null,
+        gradcamSrc: null, latencyMs: Math.round(performance.now() - start),
+        errorMsg: 'Serveur non disponible. Lancez : uvicorn api_server:app --reload --port 8000',
+      });
+    }
   });
 };
 
@@ -171,7 +591,7 @@ const DisclaimerBanner = ({ onDismiss }) => (
 );
 
 // ── Top Navigation ─────────────────────────────────────────────────────────────
-const TopNav = ({ showMetrics, setShowMetrics }) => (
+const TopNav = ({ showMetrics, setShowMetrics, apiStatus }) => (
   <nav style={appStyles.nav}>
     <div style={appStyles.navBrand}>
       <div style={appStyles.navLogo}>
@@ -197,8 +617,14 @@ const TopNav = ({ showMetrics, setShowMetrics }) => (
         📊 Performances
       </button>
       <div style={appStyles.navStatus}>
-        <span style={appStyles.statusDot}></span>
-        <span style={appStyles.statusText}>Modèle actif</span>
+        <span style={{
+          ...appStyles.statusDot,
+          background: apiStatus === 'online' ? '#16A34A' : apiStatus === 'offline' ? '#DC2626' : '#F59E0B',
+          boxShadow: apiStatus === 'online' ? '0 0 0 2px rgba(22,163,74,0.2)' : apiStatus === 'offline' ? '0 0 0 2px rgba(220,38,38,0.2)' : '0 0 0 2px rgba(245,158,11,0.2)',
+        }}></span>
+        <span style={appStyles.statusText}>
+          {apiStatus === 'online' ? 'Modèle connecté' : apiStatus === 'offline' ? 'Serveur hors ligne' : 'Connexion…'}
+        </span>
       </div>
     </div>
   </nav>
@@ -224,6 +650,13 @@ const App = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [showMetricsLocal, setShowMetricsLocal] = useState(tweaks.showMetrics);
+  const [apiStatus, setApiStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
+
+  useEffect(() => {
+    fetch(`${API_BASE}/health`)
+      .then(r => r.ok ? setApiStatus('online') : setApiStatus('offline'))
+      .catch(() => setApiStatus('offline'));
+  }, []);
 
   const handleImageLoaded = (src, name) => {
     setImageSrc(src);
@@ -263,7 +696,7 @@ const App = () => {
       <TopNav showMetrics={showMetricsLocal} setShowMetrics={(v) => {
         setShowMetricsLocal(v);
         setTweak('showMetrics', v);
-      }} />
+      }} apiStatus={apiStatus} />
 
       <main style={appStyles.main}>
         {/* Side-by-side workspace */}
